@@ -50,6 +50,25 @@
 #include "socketfuzzer.h"
 #include "subproc.h"
 
+/* FUZZERLOG: include the logger vars and types */
+#include "fuzzerlogger.h"
+
+reset_chances_handle reset_chances;
+increase_chances_handle increase_chances;
+reset_mutator_names_handle reset_mutator_names;
+add_mutator_name_handle add_mutator_name;
+get_mutated_handle get_mutated;
+changed_seed_handle changed_seed;
+log_new_seed_handle log_new_seed;
+reset_current_seed_name_handle reset_current_seed_name;
+set_current_seed_name_handle set_current_seed_name;
+set_splice_seed_name_handle set_splice_seed_name;
+log_chances_handle log_chances;
+log_previous_chances_handle log_previous_chances;
+fuzzer_logger_start_handle fuzzer_logger_start;
+fuzzer_logger_end_handle fuzzer_logger_end;
+
+
 static time_t termTimeStamp = 0;
 
 bool fuzz_isTerminating(void) {
@@ -455,6 +474,15 @@ static void fuzz_fuzzLoop(run_t* run) {
         return;
     }
     report_saveReport(run);
+
+    /* FUZZERLOG: log chances */
+    if (get_mutated()) {
+        increase_chances();
+    }
+    if (changed_seed()) {
+        log_previous_chances();
+        reset_chances();
+    }
 }
 
 static void fuzz_fuzzLoopSocket(run_t* run) {
@@ -564,6 +592,25 @@ static void* fuzz_threadNew(void* arg) {
     if (!arch_archThreadInit(&run)) {
         LOG_F("Could not initialize the thread");
     }
+
+    void *fuzzer_log_lib = dlopen("/usr/local/lib/libfuzzerlog.so", RTLD_LAZY | RTLD_DEEPBIND);
+
+    reset_chances = dlsym(fuzzer_log_lib, "reset_chances");
+    increase_chances = dlsym(fuzzer_log_lib, "increase_chances");
+    reset_mutator_names = dlsym(fuzzer_log_lib, "reset_mutator_names");
+    add_mutator_name = dlsym(fuzzer_log_lib, "add_mutator_name");
+    get_mutated = dlsym(fuzzer_log_lib, "get_mutated");
+    changed_seed = dlsym(fuzzer_log_lib, "changed_seed");
+    log_new_seed = dlsym(fuzzer_log_lib, "log_new_seed");
+    reset_current_seed_name = dlsym(fuzzer_log_lib, "reset_current_seed_name");
+    set_current_seed_name = dlsym(fuzzer_log_lib, "set_current_seed_name");
+    set_splice_seed_name = dlsym(fuzzer_log_lib, "set_splice_seed_name");
+    log_chances = dlsym(fuzzer_log_lib, "log_chances");
+    log_previous_chances = dlsym(fuzzer_log_lib, "log_previous_chances");
+    fuzzer_logger_start = dlsym(fuzzer_log_lib, "fuzzer_logger_start");
+    fuzzer_logger_end = dlsym(fuzzer_log_lib, "fuzzer_logger_end");
+
+    fuzzer_logger_start();
 
     for (;;) {
         /* Check if dry run mode with verifier enabled */

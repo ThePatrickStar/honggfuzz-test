@@ -44,6 +44,9 @@
 #include "mangle.h"
 #include "subproc.h"
 
+/* FUZZERLOG: include the logger vars and types */
+#include "fuzzerlogger.h"
+
 void input_setSize(run_t* run, size_t sz) {
     if (run->dynfile->size == sz) {
         return;
@@ -406,6 +409,11 @@ void input_addDynamicInput(run_t* run) {
         TAILQ_INSERT_TAIL(&run->global->io.dynfileq, dynfile, pointers);
     }
 
+    /* FUZZERLOG: log new seed */
+    if (get_mutated()) {
+        log_new_seed(dynfile->path, "default");
+    }
+
     if (run->global->socketFuzzer.enabled) {
         /* Don't add coverage data to files in socketFuzzer mode */
         return;
@@ -569,6 +577,8 @@ bool input_prepareDynamicInput(run_t* run, bool needs_mangle) {
     memcpy(run->dynfile->data, run->current->data, run->current->size);
 
     if (needs_mangle) {
+        /* FUZZERLOG: log current file name */
+        set_current_seed_name(run->current->path);
         mangle_mangleContent(run, speed_factor);
     }
 
@@ -722,6 +732,9 @@ const uint8_t* input_getRandomInputAsBuf(run_t* run, size_t* len) {
     }
 
     *len = current->size;
+    /* FUZZERLOG: log splice selection */
+    set_splice_seed_name(current->path);
+
     return current->data;
 }
 

@@ -39,6 +39,10 @@
 #include "libhfcommon/log.h"
 #include "libhfcommon/util.h"
 
+
+/* FUZZERLOG: include the logger vars and types */
+#include "fuzzerlogger.h"
+
 static inline size_t mangle_LenLeft(run_t* run, size_t off) {
     if (off >= run->dynfile->size) {
         LOG_F("Offset is too large: off:%zu >= len:%zu", off, run->dynfile->size);
@@ -169,6 +173,9 @@ static void mangle_MemSwap(run_t* run, bool printable HF_ATTR_UNUSED) {
         return;
     }
 
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("rnd_memswap");
+
     for (size_t i = 0; i < (len / 2); i++) {
         /*
          * First - from the head, next from the tail. Don't worry about layout of the overlapping
@@ -185,6 +192,9 @@ static void mangle_MemSwap(run_t* run, bool printable HF_ATTR_UNUSED) {
 }
 
 static void mangle_MemCopy(run_t* run, bool printable HF_ATTR_UNUSED) {
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("rnd_memcopy");
+
     size_t off = mangle_getOffSet(run);
     size_t len = mangle_getLen(run->dynfile->size - off);
 
@@ -199,6 +209,9 @@ static void mangle_MemCopy(run_t* run, bool printable HF_ATTR_UNUSED) {
 }
 
 static void mangle_Bytes(run_t* run, bool printable) {
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("rnd_bytes");
+
     uint16_t buf;
     if (printable) {
         util_rndBufPrintable((uint8_t*)&buf, sizeof(buf));
@@ -222,6 +235,9 @@ static void mangle_ByteRepeat(run_t* run, bool printable) {
         return;
     }
 
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("byte_repeat");
+
     size_t len = mangle_getLen(maxSz);
     if (util_rnd64() & 0x1) {
         len = mangle_Inflate(run, destOff, len, printable);
@@ -230,6 +246,9 @@ static void mangle_ByteRepeat(run_t* run, bool printable) {
 }
 
 static void mangle_Bit(run_t* run, bool printable) {
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("rnd_bitflip");
+
     size_t off = mangle_getOffSet(run);
     run->dynfile->data[off] ^= (uint8_t)(1U << util_rndGet(0, 7));
     if (printable) {
@@ -476,6 +495,9 @@ static const struct {
 
 static void mangle_Magic(run_t* run, bool printable) {
     uint64_t choice = util_rndGet(0, ARRAYSIZE(mangleMagicVals) - 1);
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("magic_values");
+
     mangle_UseValue(run, mangleMagicVals[choice].val, mangleMagicVals[choice].size, printable);
 }
 
@@ -484,6 +506,9 @@ static void mangle_StaticDict(run_t* run, bool printable) {
         mangle_Bytes(run, printable);
         return;
     }
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("static_dict");
+
     uint64_t choice = util_rndGet(0, run->global->mutate.dictionaryCnt - 1);
     mangle_UseValue(run, run->global->mutate.dictionary[choice].val,
         run->global->mutate.dictionary[choice].len, printable);
@@ -516,10 +541,16 @@ static void mangle_ConstFeedbackDict(run_t* run, bool printable) {
         mangle_Bytes(run, printable);
         return;
     }
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("dyn_dict");
+
     mangle_UseValue(run, val, len, printable);
 }
 
 static void mangle_MemSet(run_t* run, bool printable) {
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("rnd_memset");
+
     size_t off = mangle_getOffSet(run);
     size_t len = mangle_getLen(run->dynfile->size - off);
     int    val = printable ? (int)util_rndPrintable() : (int)util_rndGet(0, UINT8_MAX);
@@ -532,6 +563,9 @@ static void mangle_MemSet(run_t* run, bool printable) {
 }
 
 static void mangle_MemClr(run_t* run, bool printable) {
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("rnd_memclr");
+
     size_t off = mangle_getOffSet(run);
     size_t len = mangle_getLen(run->dynfile->size - off);
     int    val = printable ? ' ' : 0;
@@ -544,6 +578,9 @@ static void mangle_MemClr(run_t* run, bool printable) {
 }
 
 static void mangle_RandomBuf(run_t* run, bool printable) {
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("pure_rnd_bytes");
+
     size_t off = mangle_getOffSet(run);
     size_t len = mangle_getLen(run->dynfile->size - off);
 
@@ -642,10 +679,19 @@ static void mangle_AddSub(run_t* run, bool printable) {
         LOG_F("Invalid operand size: %zu", varLen);
     }
 
+
+    /* FUZZERLOG: add mutator name */
+    char mutator_name[20];
+    sprintf(mutator_name, "add_sub_%ld", range);
+    add_mutator_name(mutator_name);
+
     mangle_AddSubWithRange(run, off, varLen, range, printable);
 }
 
 static void mangle_IncByte(run_t* run, bool printable) {
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("byte_inc");
+
     size_t off = mangle_getOffSet(run);
     if (printable) {
         run->dynfile->data[off] = (run->dynfile->data[off] - 32 + 1) % 95 + 32;
@@ -655,6 +701,9 @@ static void mangle_IncByte(run_t* run, bool printable) {
 }
 
 static void mangle_DecByte(run_t* run, bool printable) {
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("byte_dec");
+
     size_t off = mangle_getOffSet(run);
     if (printable) {
         run->dynfile->data[off] = (run->dynfile->data[off] - 32 + 94) % 95 + 32;
@@ -664,6 +713,9 @@ static void mangle_DecByte(run_t* run, bool printable) {
 }
 
 static void mangle_NegByte(run_t* run, bool printable) {
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("byte_flip");
+
     size_t off = mangle_getOffSet(run);
     if (printable) {
         run->dynfile->data[off] = 94 - (run->dynfile->data[off] - 32) + 32;
@@ -673,6 +725,9 @@ static void mangle_NegByte(run_t* run, bool printable) {
 }
 
 static void mangle_Expand(run_t* run, bool printable) {
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("expand");
+
     size_t off = mangle_getOffSet(run);
     size_t len;
     if (util_rnd64() % 16) {
@@ -694,6 +749,9 @@ static void mangle_Shrink(run_t* run, bool printable HF_ATTR_UNUSED) {
     if (len == 0) {
         return;
     }
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("shrink");
+
     if (util_rnd64() % 16) {
         len = mangle_getLen(HF_MIN(16, len));
     } else {
@@ -707,6 +765,9 @@ static void mangle_Shrink(run_t* run, bool printable HF_ATTR_UNUSED) {
 }
 
 static void mangle_ASCIINum(run_t* run, bool printable) {
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("ascii_num");
+
     size_t len = util_rndGet(2, 8);
 
     char buf[20];
@@ -773,6 +834,9 @@ static void mangle_ASCIINumChange(run_t* run, bool printable) {
     char buf[20];
     snprintf(buf, sizeof(buf), "%-19" PRIu64, val);
 
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("ascii_num_change");
+
     mangle_UseValueAt(run, off, (const uint8_t*)buf, len, printable);
 }
 
@@ -793,6 +857,9 @@ static void mangle_Splice(run_t* run, bool printable) {
         mangle_Bytes(run, printable);
         return;
     }
+
+    /* FUZZERLOG: add mutator name */
+    add_mutator_name("splice");
 
     size_t remoteOff = mangle_getLen(sz) - 1;
     size_t len       = mangle_getLen(sz - remoteOff);
