@@ -456,6 +456,9 @@ static void fuzz_fuzzLoop(run_t* run) {
     run->hwCnts.bbCnt        = 0;
     run->hwCnts.newBBCnt     = 0;
 
+    /* FUZZERLOG: reset mutator names */
+    reset_mutator_names();
+
     if (!fuzz_fetchInput(run)) {
         if (run->global->cfg.minimize && fuzz_getState(run->global) == _HF_STATE_DYNAMIC_MINIMIZE) {
             fuzz_setTerminating();
