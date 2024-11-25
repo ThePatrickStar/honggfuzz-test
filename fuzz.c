@@ -596,25 +596,6 @@ static void* fuzz_threadNew(void* arg) {
         LOG_F("Could not initialize the thread");
     }
 
-    void *fuzzer_log_lib = dlopen("/usr/local/lib/libfuzzerlog.so", RTLD_LAZY | RTLD_DEEPBIND);
-
-    reset_chances = dlsym(fuzzer_log_lib, "reset_chances");
-    increase_chances = dlsym(fuzzer_log_lib, "increase_chances");
-    reset_mutator_names = dlsym(fuzzer_log_lib, "reset_mutator_names");
-    add_mutator_name = dlsym(fuzzer_log_lib, "add_mutator_name");
-    get_mutated = dlsym(fuzzer_log_lib, "get_mutated");
-    changed_seed = dlsym(fuzzer_log_lib, "changed_seed");
-    log_new_seed = dlsym(fuzzer_log_lib, "log_new_seed");
-    reset_current_seed_name = dlsym(fuzzer_log_lib, "reset_current_seed_name");
-    set_current_seed_name = dlsym(fuzzer_log_lib, "set_current_seed_name");
-    set_splice_seed_name = dlsym(fuzzer_log_lib, "set_splice_seed_name");
-    log_chances = dlsym(fuzzer_log_lib, "log_chances");
-    log_previous_chances = dlsym(fuzzer_log_lib, "log_previous_chances");
-    fuzzer_logger_start = dlsym(fuzzer_log_lib, "fuzzer_logger_start");
-    fuzzer_logger_end = dlsym(fuzzer_log_lib, "fuzzer_logger_end");
-
-    fuzzer_logger_start();
-
     for (;;) {
         /* Check if dry run mode with verifier enabled */
         if (run.global->mutate.mutationsPerRun == 0U && run.global->cfg.useVerifier &&
@@ -677,6 +658,72 @@ void fuzz_threadsStart(honggfuzz_t* hfuzz) {
         LOG_I("Entering phase: Static");
         hfuzz->feedback.state = _HF_STATE_STATIC;
     }
+
+    void *fuzzer_log_lib = dlopen("/usr/local/lib/libfuzzerlog.so", RTLD_LAZY | RTLD_DEEPBIND);
+    if (!fuzzer_log_lib) {
+        perror("dlopen() failed");
+        fprintf(stderr, "%s\n", dlerror());
+        LOG_F("fuzzer_log: Could not load /usr/local/lib/libfuzzerlog.so");
+    }
+
+    reset_chances = dlsym(fuzzer_log_lib, "reset_chances");
+    if (!reset_chances) {
+        LOG_F("fuzzer_log: Could not load reset_chances!");
+    }
+    increase_chances = dlsym(fuzzer_log_lib, "increase_chances");
+    if (!increase_chances) {
+        LOG_F("fuzzer_log: Could not load increase_chances!");
+    }
+    reset_mutator_names = dlsym(fuzzer_log_lib, "reset_mutator_names");
+    if (!reset_mutator_names) {
+        LOG_F("fuzzer_log: Could not load reset_mutator_names!");
+    }
+    add_mutator_name = dlsym(fuzzer_log_lib, "add_mutator_name");
+    if (!add_mutator_name) {
+        LOG_F("fuzzer_log: Could not load add_mutator_name!");
+    }
+    get_mutated = dlsym(fuzzer_log_lib, "get_mutated");
+    if (!get_mutated) {
+        LOG_F("fuzzer_log: Could not load get_mutated!");
+    }
+    changed_seed = dlsym(fuzzer_log_lib, "changed_seed");
+    if (!changed_seed) {
+        LOG_F("fuzzer_log: Could not load changed_seed!");
+    }
+    log_new_seed = dlsym(fuzzer_log_lib, "log_new_seed");
+    if (!log_new_seed) {
+        LOG_F("fuzzer_log: Could not load log_new_seed!");
+    }
+    reset_current_seed_name = dlsym(fuzzer_log_lib, "reset_current_seed_name");
+    if (!reset_current_seed_name) {
+        LOG_F("fuzzer_log: Could not load reset_current_seed_name!");
+    }
+    set_current_seed_name = dlsym(fuzzer_log_lib, "set_current_seed_name");
+    if (!set_current_seed_name) {
+        LOG_F("fuzzer_log: Could not load set_current_seed_name!");
+    }
+    set_splice_seed_name = dlsym(fuzzer_log_lib, "set_splice_seed_name");
+    if (!set_splice_seed_name) {
+        LOG_F("fuzzer_log: Could not load set_splice_seed_name!");
+    }
+    log_chances = dlsym(fuzzer_log_lib, "log_chances");
+    if (!log_chances) {
+        LOG_F("fuzzer_log: Could not load log_chances!");
+    }
+    log_previous_chances = dlsym(fuzzer_log_lib, "log_previous_chances");
+    if (!log_previous_chances) {
+        LOG_F("fuzzer_log: Could not load log_previous_chances!");
+    }
+    fuzzer_logger_start = dlsym(fuzzer_log_lib, "fuzzer_logger_start");
+    if (!fuzzer_logger_start) {
+        LOG_F("fuzzer_log: Could not load fuzzer_logger_start!");
+    }
+    fuzzer_logger_end = dlsym(fuzzer_log_lib, "fuzzer_logger_end");
+    if (!fuzzer_logger_end) {
+        LOG_F("fuzzer_log: Could not load fuzzer_logger_end!");
+    }
+
+    fuzzer_logger_start();
 
     for (size_t i = 0; i < hfuzz->threads.threadsMax; i++) {
         if (!subproc_runThread(
