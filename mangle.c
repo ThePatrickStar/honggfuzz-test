@@ -843,6 +843,7 @@ static void mangle_Resize(run_t* run, bool printable) {
 }
 
 void mangle_mangleContent(run_t* run) {
+    (void)mangle_ConstFeedbackDict;
     static void (*const mangleFuncs[])(run_t* run, bool printable) = {
         mangle_Shrink,
         mangle_Expand,
@@ -861,10 +862,8 @@ void mangle_mangleContent(run_t* run) {
         mangle_ByteRepeat,
         mangle_Magic,
         mangle_StaticDict,
-        mangle_ConstFeedbackDict,
         mangle_RandomBuf,
         mangle_Splice,
-        mangle_ConstFeedbackDict,
     };
 
     if (run->mutationsPerRun == 0U) {
