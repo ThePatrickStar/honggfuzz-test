@@ -411,7 +411,7 @@ int main(int argc, char** argv) {
     if (hfuzz.feedback.cmpFeedback) {
         if (!(hfuzz.feedback.cmpFeedbackMap = files_mapSharedMem(sizeof(cmpfeedback_t),
                   &hfuzz.feedback.cmpFeedbackFd, "hf-cmpfeedback", /* nocore= */ true,
-                  /* export= */ hfuzz.io.exportFeedback))) {
+                  /* export= */ true))) {
             LOG_F("files_mapSharedMem(name='hf-cmpfeedback', sz=%zu, dir='%s') failed",
                 sizeof(cmpfeedback_t), hfuzz.io.workDir);
         }
