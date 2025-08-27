@@ -682,7 +682,7 @@ static void mangle_AddSub(run_t* run, bool printable) {
 
     /* FUZZERLOG: add mutator name */
     char mutator_name[20];
-    sprintf(mutator_name, "add_sub_%ld", range);
+    sprintf(mutator_name, "add_sub_%ld", varLen);
     add_mutator_name(mutator_name);
 
     mangle_AddSubWithRange(run, off, varLen, range, printable);
