@@ -67,6 +67,8 @@ log_chances_handle log_chances;
 log_previous_chances_handle log_previous_chances;
 fuzzer_logger_start_handle fuzzer_logger_start;
 fuzzer_logger_end_handle fuzzer_logger_end;
+start_exec_target_handle start_exec_target;
+end_exec_target_handle end_exec_target;
 
 
 static time_t termTimeStamp = 0;
@@ -721,6 +723,14 @@ void fuzz_threadsStart(honggfuzz_t* hfuzz) {
     fuzzer_logger_end = dlsym(fuzzer_log_lib, "fuzzer_logger_end");
     if (!fuzzer_logger_end) {
         LOG_F("fuzzer_log: Could not load fuzzer_logger_end!");
+    }
+    start_exec_target = dlsym(fuzzer_log_lib, "start_exec_target");
+    if (start_exec_target == NULL) {
+        LOG_F("fuzzer_log: Could not load start_exec_target: %s", dlerror());
+    }
+    end_exec_target = dlsym(fuzzer_log_lib, "end_exec_target");
+    if (end_exec_target == NULL) {
+        LOG_F("fuzzer_log: Could not load end_exec_target: %s", dlerror());
     }
 
     fuzzer_logger_start();
