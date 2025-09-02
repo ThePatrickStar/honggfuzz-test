@@ -661,7 +661,7 @@ void fuzz_threadsStart(honggfuzz_t* hfuzz) {
         hfuzz->feedback.state = _HF_STATE_STATIC;
     }
 
-    void *fuzzer_log_lib = dlopen("/usr/local/lib/libfuzzerlog.so", RTLD_LAZY | RTLD_DEEPBIND);
+    void *fuzzer_log_lib = dlopen("/usr/local/lib/libfuzzerlog.so", RTLD_LAZY);
     if (!fuzzer_log_lib) {
         perror("dlopen() failed");
         fprintf(stderr, "%s\n", dlerror());

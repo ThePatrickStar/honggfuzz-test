@@ -40,6 +40,7 @@
 
 #include "arch.h"
 #include "fuzz.h"
+#include "fuzzerlogger.h"
 #include "libhfcommon/common.h"
 #include "libhfcommon/files.h"
 #include "libhfcommon/log.h"
@@ -432,13 +433,16 @@ static bool subproc_New(run_t* run) {
 }
 
 bool subproc_Run(run_t* run) {
+    start_exec_target();
     if (!subproc_New(run)) {
         LOG_E("subproc_New()");
+        end_exec_target();
         return false;
     }
 
     arch_prepareParent(run);
     arch_reapChild(run);
+    end_exec_target();
 
     int64_t diffUSecs = util_timeNowUSecs() - run->timeStartedUSecs;
 
