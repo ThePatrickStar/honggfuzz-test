@@ -118,6 +118,18 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
         }
     }
 
+    /* Check environment variable for speed preference feature */
+    static bool prefer_faster_seeds_checked = false;
+    static bool prefer_faster_seeds_enabled = true;
+    if (!prefer_faster_seeds_checked) {
+        prefer_faster_seeds_checked = true;
+        const char* env_val         = getenv("HFUZZ_PREFER_FASTER_SEEDS");
+        if (env_val && (env_val[0] == '0' || env_val[0] == 'n' || env_val[0] == 'N')) {
+            prefer_faster_seeds_enabled = false;
+            LOG_I("Speed preference disabled via HFUZZ_PREFER_FASTER_SEEDS");
+        }
+    }
+
     /* Phase-aware energy - dry-run phase explores more, main phase exploits */
     fuzzState_t phase = run->global->feedback.state;
     if (phase == _HF_STATE_DYNAMIC_DRY_RUN) {
@@ -150,15 +162,17 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
     }
 
     /* Speed - faster inputs allow more mutations per second */
-    uint64_t mutations = ATOMIC_GET(run->global->cnts.mutationsCnt);
-    if (mutations > 0) {
-        uint64_t elapsed   = (uint64_t)(now - run->global->timing.timeStart);
-        uint64_t avg_usecs = elapsed > 0 ? (elapsed * 1000000ULL) / mutations : 1000;
-        avg_usecs          = HF_CAP(avg_usecs, 100ULL, 10000000ULL);
+    if (prefer_faster_seeds_enabled) {
+        uint64_t mutations = ATOMIC_GET(run->global->cnts.mutationsCnt);
+        if (mutations > 0) {
+            uint64_t elapsed   = (uint64_t)(now - run->global->timing.timeStart);
+            uint64_t avg_usecs = elapsed > 0 ? (elapsed * 1000000ULL) / mutations : 1000;
+            avg_usecs          = HF_CAP(avg_usecs, 100ULL, 10000000ULL);
 
-        uint64_t exec_usecs  = HF_CAP(dynfile->timeExecUSecs, 100ULL, 10000000ULL);
-        uint64_t speed_ratio = HF_CAP((avg_usecs * 16) / exec_usecs, 1ULL, 256ULL);
-        energy               = (energy * speed_ratio) / 16;
+            uint64_t exec_usecs  = HF_CAP(dynfile->timeExecUSecs, 100ULL, 10000000ULL);
+            uint64_t speed_ratio = HF_CAP((avg_usecs * 16) / exec_usecs, 1ULL, 256ULL);
+            energy               = (energy * speed_ratio) / 16;
+        }
     }
 
     /* Fertility - inputs that produced children are in promising regions */
