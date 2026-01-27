@@ -23,9 +23,12 @@
 
 #include "power.h"
 
+#include <stdbool.h>
+#include <stdlib.h>
 #include <time.h>
 
 #include "libhfcommon/common.h"
+#include "libhfcommon/log.h"
 #include "libhfcommon/util.h"
 
 /*
@@ -91,11 +94,23 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
     uint64_t energy = POWER_BASE_ENERGY;
     time_t   now    = time(NULL);
 
+    /* Check environment variable for size preference feature */
+    static bool prefer_shorter_seeds_checked = false;
+    static bool prefer_shorter_seeds_enabled = true;
+    if (!prefer_shorter_seeds_checked) {
+        prefer_shorter_seeds_checked = true;
+        const char* env_val          = getenv("HFUZZ_PREFER_SHORTER_SEEDS");
+        if (env_val && (env_val[0] == '0' || env_val[0] == 'n' || env_val[0] == 'N')) {
+            prefer_shorter_seeds_enabled = false;
+            LOG_I("Size preference disabled via HFUZZ_PREFER_SHORTER_SEEDS");
+        }
+    }
+
     /* Phase-aware energy - dry-run phase explores more, main phase exploits */
     fuzzState_t phase = run->global->feedback.state;
     if (phase == _HF_STATE_DYNAMIC_DRY_RUN) {
         /* During dry-run, favor smaller/faster inputs for quick exploration */
-        if (dynfile->size < 256) {
+        if (prefer_shorter_seeds_enabled && dynfile->size < 256) {
             energy = (energy * 3) / 2;
         }
     }
@@ -152,7 +167,7 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
     }
 
     /* Size - smaller inputs are faster and easier to analyze */
-    if (dynfile->size > 1024) {
+    if (prefer_shorter_seeds_enabled && dynfile->size > 1024) {
         uint32_t log_size = util_Log2(dynfile->size);
         if (log_size > 10) energy >>= HF_MIN(log_size - 10, 4);
     }
