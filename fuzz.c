@@ -50,6 +50,36 @@
 #include "socketfuzzer.h"
 #include "subproc.h"
 
+/* FUZZERLOG: include the logger vars and types */
+#include "fuzzerlogger.h"
+
+fuzzerlog_reset_chances_handle fuzzerlog_reset_chances;
+fuzzerlog_increase_chances_handle fuzzerlog_increase_chances;
+fuzzerlog_reset_mutator_names_handle fuzzerlog_reset_mutator_names;
+fuzzerlog_add_mutator_name_handle fuzzerlog_add_mutator_name;
+fuzzerlog_get_mutated_handle fuzzerlog_get_mutated;
+fuzzerlog_new_seed_handle fuzzerlog_new_seed;
+fuzzerlog_reset_current_seed_name_handle fuzzerlog_reset_current_seed_name;
+fuzzerlog_set_current_seed_name_handle fuzzerlog_set_current_seed_name;
+fuzzerlog_changed_seed_handle fuzzerlog_changed_seed;
+fuzzerlog_set_splice_seed_name_handle fuzzerlog_set_splice_seed_name;
+fuzzerlog_chances_handle fuzzerlog_chances;
+fuzzerlog_previous_chances_handle fuzzerlog_previous_chances;
+fuzzerlog_start_handle fuzzerlog_start;
+fuzzerlog_end_handle fuzzerlog_end;
+fuzzerlog_init_log_file_fs_handle fuzzerlog_init_log_file_fs;
+fuzzerlog_close_log_file_fs_handle fuzzerlog_close_log_file_fs;
+fuzzerlog_start_exec_target_handle fuzzerlog_start_exec_target;
+fuzzerlog_end_exec_target_handle fuzzerlog_end_exec_target;
+fuzzerlog_get_chance_handle fuzzerlog_get_chance;
+fuzzerlog_info_handle fuzzerlog_info;
+fuzzerlog_warn_handle fuzzerlog_warn;
+fuzzerlog_conf_handle fuzzerlog_conf;
+fuzzerlog_reset_kept_reasons_handle fuzzerlog_reset_kept_reasons;
+fuzzerlog_new_seed_multi_reason_handle fuzzerlog_new_seed_multi_reason;
+fuzzerlog_add_kept_reason_handle fuzzerlog_add_kept_reason;
+
+
 static time_t termTimeStamp = 0;
 
 bool fuzz_isTerminating(void) {
@@ -492,6 +522,9 @@ static void fuzz_fuzzLoop(run_t* run) {
     run->hwCnts.bbCnt        = 0;
     run->hwCnts.newBBCnt     = 0;
 
+    /* FUZZERLOG: reset mutator names */
+    fuzzerlog_reset_mutator_names();
+
     if (!fuzz_fetchInput(run)) {
         if (run->global->cfg.minimize && fuzz_getState(run->global) == _HF_STATE_DYNAMIC_MINIMIZE) {
             fuzz_setTerminating();
@@ -510,6 +543,15 @@ static void fuzz_fuzzLoop(run_t* run) {
         return;
     }
     report_saveReport(run);
+
+    /* FUZZERLOG: log chances */
+    if (fuzzerlog_get_mutated()) {
+        fuzzerlog_increase_chances();
+    }
+    if (fuzzerlog_changed_seed()) {
+        fuzzerlog_previous_chances();
+        fuzzerlog_reset_chances();
+    }
 }
 
 static void fuzz_fuzzLoopSocket(run_t* run) {
@@ -682,6 +724,80 @@ void fuzz_threadsStart(honggfuzz_t* hfuzz) {
         LOG_I("Entering phase: Static");
         hfuzz->feedback.state = _HF_STATE_STATIC;
     }
+
+    void *fuzzer_log_lib = dlopen("/usr/local/lib/libfuzzerlog.so", RTLD_LAZY);
+    if (!fuzzer_log_lib) {
+        perror("dlopen() failed");
+        fprintf(stderr, "%s\n", dlerror());
+        LOG_F("fuzzer_log: Could not load /usr/local/lib/libfuzzerlog.so");
+    }
+
+    fuzzerlog_reset_chances = dlsym(fuzzer_log_lib, "fuzzerlog_reset_chances");
+    if (!fuzzerlog_reset_chances) {
+        LOG_F("fuzzer_log: Could not load fuzzerlog_reset_chances!");
+    }
+    fuzzerlog_increase_chances = dlsym(fuzzer_log_lib, "fuzzerlog_increase_chances");
+    if (!fuzzerlog_increase_chances) {
+        LOG_F("fuzzer_log: Could not load fuzzerlog_increase_chances!");
+    }
+    fuzzerlog_reset_mutator_names = dlsym(fuzzer_log_lib, "fuzzerlog_reset_mutator_names");
+    if (!fuzzerlog_reset_mutator_names) {
+        LOG_F("fuzzer_log: Could not load fuzzerlog_reset_mutator_names!");
+    }
+    fuzzerlog_add_mutator_name = dlsym(fuzzer_log_lib, "fuzzerlog_add_mutator_name");
+    if (!fuzzerlog_add_mutator_name) {
+        LOG_F("fuzzer_log: Could not load fuzzerlog_add_mutator_name!");
+    }
+    fuzzerlog_get_mutated = dlsym(fuzzer_log_lib, "fuzzerlog_get_mutated");
+    if (!fuzzerlog_get_mutated) {
+        LOG_F("fuzzer_log: Could not load fuzzerlog_get_mutated!");
+    }
+    fuzzerlog_changed_seed = dlsym(fuzzer_log_lib, "fuzzerlog_changed_seed");
+    if (!fuzzerlog_changed_seed) {
+        LOG_F("fuzzer_log: Could not load fuzzerlog_changed_seed!");
+    }
+    fuzzerlog_new_seed = dlsym(fuzzer_log_lib, "fuzzerlog_new_seed");
+    if (!fuzzerlog_new_seed) {
+        LOG_F("fuzzer_log: Could not load fuzzerlog_new_seed!");
+    }
+    fuzzerlog_reset_current_seed_name = dlsym(fuzzer_log_lib, "fuzzerlog_reset_current_seed_name");
+    if (!fuzzerlog_reset_current_seed_name) {
+        LOG_F("fuzzer_log: Could not load fuzzerlog_reset_current_seed_name!");
+    }
+    fuzzerlog_set_current_seed_name = dlsym(fuzzer_log_lib, "fuzzerlog_set_current_seed_name");
+    if (!fuzzerlog_set_current_seed_name) {
+        LOG_F("fuzzer_log: Could not load fuzzerlog_set_current_seed_name!");
+    }
+    fuzzerlog_set_splice_seed_name = dlsym(fuzzer_log_lib, "fuzzerlog_set_splice_seed_name");
+    if (!fuzzerlog_set_splice_seed_name) {
+        LOG_F("fuzzer_log: Could not load fuzzerlog_set_splice_seed_name!");
+    }
+    fuzzerlog_chances = dlsym(fuzzer_log_lib, "fuzzerlog_chances");
+    if (!fuzzerlog_chances) {
+        LOG_F("fuzzer_log: Could not load fuzzerlog_chances!");
+    }
+    fuzzerlog_previous_chances = dlsym(fuzzer_log_lib, "fuzzerlog_previous_chances");
+    if (!fuzzerlog_previous_chances) {
+        LOG_F("fuzzer_log: Could not load fuzzerlog_previous_chances!");
+    }
+    fuzzerlog_start = dlsym(fuzzer_log_lib, "fuzzerlog_start");
+    if (!fuzzerlog_start) {
+        LOG_F("fuzzer_log: Could not load fuzzerlog_start!");
+    }
+    fuzzerlog_end = dlsym(fuzzer_log_lib, "fuzzerlog_end");
+    if (!fuzzerlog_end) {
+        LOG_F("fuzzer_log: Could not load fuzzerlog_end!");
+    }
+    fuzzerlog_start_exec_target = dlsym(fuzzer_log_lib, "fuzzerlog_start_exec_target");
+    if (fuzzerlog_start_exec_target == NULL) {
+        LOG_F("fuzzer_log: Could not load fuzzerlog_start_exec_target: %s", dlerror());
+    }
+    fuzzerlog_end_exec_target = dlsym(fuzzer_log_lib, "fuzzerlog_end_exec_target");
+    if (fuzzerlog_end_exec_target == NULL) {
+        LOG_F("fuzzer_log: Could not load fuzzerlog_end_exec_target: %s", dlerror());
+    }
+
+    fuzzerlog_start();
 
     for (size_t i = 0; i < hfuzz->threads.threadsMax; i++) {
         if (!subproc_runThread(
