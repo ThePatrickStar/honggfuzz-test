@@ -106,6 +106,18 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
         }
     }
 
+    /* Check environment variable for coverage preference feature */
+    static bool prefer_higher_coverage_checked = false;
+    static bool prefer_higher_coverage_enabled = true;
+    if (!prefer_higher_coverage_checked) {
+        prefer_higher_coverage_checked = true;
+        const char* env_val            = getenv("HFUZZ_PREFER_HIGHER_COVERAGE");
+        if (env_val && (env_val[0] == '0' || env_val[0] == 'n' || env_val[0] == 'N')) {
+            prefer_higher_coverage_enabled = false;
+            LOG_I("Coverage preference disabled via HFUZZ_PREFER_HIGHER_COVERAGE");
+        }
+    }
+
     /* Phase-aware energy - dry-run phase explores more, main phase exploits */
     fuzzState_t phase = run->global->feedback.state;
     if (phase == _HF_STATE_DYNAMIC_DRY_RUN) {
@@ -119,7 +131,7 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
      * Novelty - inputs that discovered new edges explore unknown territory.
      * Decay novelty bonus over time - edges discovered 10+ minutes ago are less novel.
      */
-    if (dynfile->newEdges > 0) {
+    if (prefer_higher_coverage_enabled && dynfile->newEdges > 0) {
         time_t   age_mins = (now - dynfile->timeAdded) / 60;
         uint32_t decay    = (age_mins < 10) ? 0 : HF_MIN(age_mins / 10, 6);
         uint32_t boost    = HF_MIN(dynfile->newEdges, 8);
@@ -129,7 +141,7 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
     }
 
     /* Density - inputs with high coverage per byte are efficient */
-    if (dynfile->size > 0 && dynfile->cov[0] > 0) {
+    if (prefer_higher_coverage_enabled && dynfile->size > 0 && dynfile->cov[0] > 0) {
         /* coverage / size * 100 */
         uint64_t density = (dynfile->cov[0] * 100) / dynfile->size;
         /* Heuristic - >50% instructions/bytes is good (small dense loops), >200% is amazing */
@@ -202,7 +214,7 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
     }
 
     /* Rare edge bonus - inputs hitting edges seen by few corpus entries */
-    if (dynfile->rareEdgeCnt > 0) {
+    if (prefer_higher_coverage_enabled && dynfile->rareEdgeCnt > 0) {
         uint32_t rare_boost = HF_MIN(dynfile->rareEdgeCnt, 8);
         energy              = (energy * (8 + rare_boost)) / 8;
     }
@@ -224,15 +236,17 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
     }
 
     /* Stagnation - focus on best inputs when stuck */
-    time_t stagnation = now - ATOMIC_GET(run->global->timing.lastCovUpdate);
-    if (stagnation > 60) {
-        uint64_t maxCov = ATOMIC_GET(run->global->feedback.maxCov[0]);
-        if (maxCov > 0 && dynfile->cov[0] > 0) {
-            uint64_t pct = (dynfile->cov[0] * 100) / maxCov;
-            if (pct >= 80)
-                energy <<= 2; /* Boost high coverage */
-            else if (pct < 10)
-                energy >>= 2; /* Penalize very low coverage */
+    if (prefer_higher_coverage_enabled) {
+        time_t stagnation = now - ATOMIC_GET(run->global->timing.lastCovUpdate);
+        if (stagnation > 60) {
+            uint64_t maxCov = ATOMIC_GET(run->global->feedback.maxCov[0]);
+            if (maxCov > 0 && dynfile->cov[0] > 0) {
+                uint64_t pct = (dynfile->cov[0] * 100) / maxCov;
+                if (pct >= 80)
+                    energy <<= 2; /* Boost high coverage */
+                else if (pct < 10)
+                    energy >>= 2; /* Penalize very low coverage */
+            }
         }
     }
 
