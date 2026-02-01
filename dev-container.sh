@@ -14,4 +14,4 @@ docker run \
 	-e FUZZ_TARGET=ossfuzz \
 	-e DEBUG_BUILDER=1 \
 	--entrypoint "/bin/bash" \
-	-it gcr.io/fuzzbench/builders/honggfuzz_latest/sqlite3_ossfuzz
+	gcr.io/fuzzbench/builders/honggfuzz_latest/sqlite3_ossfuzz
