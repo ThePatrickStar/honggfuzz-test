@@ -820,6 +820,7 @@ const uint8_t* input_getDiverseInputAsBuf(run_t* run, size_t* len) {
         return NULL;
     }
 
+    fuzzerlog_set_splice_seed_name(best->path);
     *len = best->size;
     return best->data;
 }
@@ -879,6 +880,8 @@ bool input_prepareStaticFile(run_t* run, bool rewind, bool needs_mangle) {
         LOG_E("Couldn't read contents of '%s'", path);
         return false;
     }
+
+    fuzzerlog_set_current_seed_name(path);
 
     if (run->staticFileTryMore && ((size_t)fileSz < run->dynfile->size)) {
         /* The file is smaller than the requested size, no need to re-read it anymore */

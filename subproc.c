@@ -442,6 +442,7 @@ bool subproc_Run(run_t* run) {
 
     arch_prepareParent(run);
     arch_reapChild(run);
+    fuzzerlog_increase_chances();
     fuzzerlog_end_exec_target();
 
     int64_t diffUSecs = util_timeNowUSecs() - run->timeStartedUSecs;

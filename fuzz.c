@@ -545,9 +545,6 @@ static void fuzz_fuzzLoop(run_t* run) {
     report_saveReport(run);
 
     /* FUZZERLOG: log chances */
-    if (fuzzerlog_get_mutated()) {
-        fuzzerlog_increase_chances();
-    }
     if (fuzzerlog_changed_seed()) {
         fuzzerlog_previous_chances();
         fuzzerlog_reset_chances();
