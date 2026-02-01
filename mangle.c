@@ -1756,8 +1756,8 @@ static void mangle_Havoc(run_t* run, bool printable) {
             break;
         }
     }
-    /* FUZZERLOG: add mutator name */
-    fuzzerlog_add_mutator_name("havoc");
+    /* FUZZERLOG: mutator scheduler */
+    fuzzerlog_conf("havoc");
 }
 
 /*
