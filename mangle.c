@@ -42,6 +42,66 @@
 /* FUZZERLOG: include the logger vars and types */
 #include "fuzzerlogger.h"
 
+/* ========== Mutator category disable flags ========== */
+typedef enum {
+    MUT_CAT_BITFLIP = 0,
+    MUT_CAT_ARITH,
+    MUT_CAT_INTERESTING,
+    MUT_CAT_DICT_EXTRA,
+    MUT_CAT_DYN_DICT,
+    MUT_CAT_RANDOM_BYTES,
+    MUT_CAT_STRUCTURAL_BYTES,
+    MUT_CAT_ASCII_NUM,
+    MUT_CAT_SPLICE,
+    MUT_CAT_CMPLOG,
+    MUT_CAT_COUNT
+} mutator_category_t;
+
+static const char* mutCatEnvVars[MUT_CAT_COUNT] = {
+    [MUT_CAT_BITFLIP]          = "HF_DISABLE_MUT_BITFLIP",
+    [MUT_CAT_ARITH]            = "HF_DISABLE_MUT_ARITH",
+    [MUT_CAT_INTERESTING]      = "HF_DISABLE_MUT_INTERESTING",
+    [MUT_CAT_DICT_EXTRA]       = "HF_DISABLE_MUT_DICT_EXTRA",
+    [MUT_CAT_DYN_DICT]         = "HF_DISABLE_MUT_DYN_DICT",
+    [MUT_CAT_RANDOM_BYTES]     = "HF_DISABLE_MUT_RANDOM_BYTES",
+    [MUT_CAT_STRUCTURAL_BYTES] = "HF_DISABLE_MUT_STRUCTURAL_BYTES",
+    [MUT_CAT_ASCII_NUM]        = "HF_DISABLE_MUT_ASCII_NUM",
+    [MUT_CAT_SPLICE]           = "HF_DISABLE_MUT_SPLICE",
+    [MUT_CAT_CMPLOG]           = "HF_DISABLE_MUT_CMPLOG",
+};
+
+static const char* mutCatNames[MUT_CAT_COUNT] = {
+    [MUT_CAT_BITFLIP]          = "bitflip",
+    [MUT_CAT_ARITH]            = "arith",
+    [MUT_CAT_INTERESTING]      = "interesting",
+    [MUT_CAT_DICT_EXTRA]       = "dict_extra",
+    [MUT_CAT_DYN_DICT]         = "dyn_dict",
+    [MUT_CAT_RANDOM_BYTES]     = "random_bytes",
+    [MUT_CAT_STRUCTURAL_BYTES] = "structural_bytes",
+    [MUT_CAT_ASCII_NUM]        = "ascii_num",
+    [MUT_CAT_SPLICE]           = "splice",
+    [MUT_CAT_CMPLOG]           = "cmplog",
+};
+
+static bool mutCatDisabled[MUT_CAT_COUNT] = {false};
+static bool mutCatChecked = false;
+
+static void mangle_checkDisabledCategories(void) {
+    if (mutCatChecked) return;
+    mutCatChecked = true;
+    for (int i = 0; i < MUT_CAT_COUNT; i++) {
+        if (getenv(mutCatEnvVars[i])) {
+            mutCatDisabled[i] = true;
+            LOG_I("Mutator category '%s' disabled via %s", mutCatNames[i], mutCatEnvVars[i]);
+        }
+    }
+}
+
+#define CHECK_MUT_DISABLED(cat) \
+    do { mangle_checkDisabledCategories(); if (mutCatDisabled[cat]) return; } while(0)
+
+/* ========== End mutator category disable flags ========== */
+
 typedef enum {
     MANGLE_SHRINK = 0,
     MANGLE_EXPAND,
@@ -203,6 +263,7 @@ static inline void mangle_UseValueAt(
 #endif
 
 static void mangle_MemSwap(run_t* run, bool printable HF_ATTR_UNUSED) {
+    CHECK_MUT_DISABLED(MUT_CAT_STRUCTURAL_BYTES);
     /* No big deal if those two are overlapping */
     size_t off1    = mangle_getOffSet(run);
     size_t maxlen1 = run->dynfile->size - off1;
@@ -233,6 +294,7 @@ static void mangle_MemSwap(run_t* run, bool printable HF_ATTR_UNUSED) {
 }
 
 static void mangle_BlockMove(run_t* run, bool printable HF_ATTR_UNUSED) {
+    CHECK_MUT_DISABLED(MUT_CAT_STRUCTURAL_BYTES);
     size_t off_from = mangle_getOffSet(run);
     size_t off_to   = mangle_getOffSet(run);
     size_t len      = mangle_getLen(run->dynfile->size);
@@ -244,6 +306,7 @@ static void mangle_BlockMove(run_t* run, bool printable HF_ATTR_UNUSED) {
 }
 
 static void mangle_MemCopy(run_t* run, bool printable HF_ATTR_UNUSED) {
+    CHECK_MUT_DISABLED(MUT_CAT_STRUCTURAL_BYTES);
     /* FUZZERLOG: add mutator name */
     fuzzerlog_add_mutator_name("rnd_memcopy");
 
@@ -261,6 +324,7 @@ static void mangle_MemCopy(run_t* run, bool printable HF_ATTR_UNUSED) {
 }
 
 static void mangle_Bytes(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_RANDOM_BYTES);
     /* FUZZERLOG: add mutator name */
     fuzzerlog_add_mutator_name("rnd_bytes");
 
@@ -277,6 +341,7 @@ static void mangle_Bytes(run_t* run, bool printable) {
 }
 
 static void mangle_ByteRepeat(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_RANDOM_BYTES);
     size_t off     = mangle_getOffSet(run);
     size_t destOff = off + 1;
     size_t maxSz   = run->dynfile->size - destOff;
@@ -298,6 +363,7 @@ static void mangle_ByteRepeat(run_t* run, bool printable) {
 }
 
 static void mangle_Bit(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_BITFLIP);
     /* FUZZERLOG: add mutator name */
     fuzzerlog_add_mutator_name("rnd_bitflip");
 
@@ -550,6 +616,7 @@ static const struct {
 };
 
 static void mangle_Magic(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_INTERESTING);
     uint64_t choice = util_rndGet(0, ARRAYSIZE(mangleMagicVals) - 1);
     /* FUZZERLOG: add mutator name */
     fuzzerlog_add_mutator_name("magic_values");
@@ -558,6 +625,7 @@ static void mangle_Magic(run_t* run, bool printable) {
 }
 
 static void mangle_StaticDict(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_DICT_EXTRA);
     if (run->global->mutate.dictionaryCnt == 0) {
         mangle_Bytes(run, printable);
         return;
@@ -592,6 +660,7 @@ static inline const uint8_t* mangle_FeedbackDict(run_t* run, size_t* len) {
 }
 
 static void mangle_ConstFeedbackDict(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_DYN_DICT);
     size_t         len;
     const uint8_t* val = mangle_FeedbackDict(run, &len);
     if (val == NULL) {
@@ -628,6 +697,7 @@ static void mangle_ConstFeedbackDict(run_t* run, bool printable) {
 }
 
 static void mangle_MemSet(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_RANDOM_BYTES);
     /* FUZZERLOG: add mutator name */
     fuzzerlog_add_mutator_name("rnd_memset");
 
@@ -643,6 +713,7 @@ static void mangle_MemSet(run_t* run, bool printable) {
 }
 
 static void mangle_MemClr(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_RANDOM_BYTES);
     /* FUZZERLOG: add mutator name */
     fuzzerlog_add_mutator_name("rnd_memclr");
 
@@ -658,6 +729,7 @@ static void mangle_MemClr(run_t* run, bool printable) {
 }
 
 static void mangle_RandomBuf(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_RANDOM_BYTES);
     /* FUZZERLOG: add mutator name */
     fuzzerlog_add_mutator_name("pure_rnd_bytes");
 
@@ -736,6 +808,7 @@ static inline void mangle_AddSubWithRange(
 }
 
 static void mangle_AddSub(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_ARITH);
     size_t off = mangle_getOffSet(run);
 
     /* 1,2,4,8 */
@@ -778,6 +851,7 @@ static void mangle_AddSub(run_t* run, bool printable) {
 }
 
 static void mangle_IncByte(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_ARITH);
     /* FUZZERLOG: add mutator name */
     fuzzerlog_add_mutator_name("byte_inc");
 
@@ -790,6 +864,7 @@ static void mangle_IncByte(run_t* run, bool printable) {
 }
 
 static void mangle_DecByte(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_ARITH);
     /* FUZZERLOG: add mutator name */
     fuzzerlog_add_mutator_name("byte_dec");
 
@@ -802,6 +877,7 @@ static void mangle_DecByte(run_t* run, bool printable) {
 }
 
 static void mangle_NegByte(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_BITFLIP);
     /* FUZZERLOG: add mutator name */
     fuzzerlog_add_mutator_name("byte_flip");
 
@@ -814,6 +890,7 @@ static void mangle_NegByte(run_t* run, bool printable) {
 }
 
 static void mangle_Expand(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_STRUCTURAL_BYTES);
     /* FUZZERLOG: add mutator name */
     fuzzerlog_add_mutator_name("expand");
 
@@ -829,6 +906,7 @@ static void mangle_Expand(run_t* run, bool printable) {
 }
 
 static void mangle_Shrink(run_t* run, bool printable HF_ATTR_UNUSED) {
+    CHECK_MUT_DISABLED(MUT_CAT_STRUCTURAL_BYTES);
     if (run->dynfile->size <= 2U) {
         return;
     }
@@ -854,6 +932,7 @@ static void mangle_Shrink(run_t* run, bool printable HF_ATTR_UNUSED) {
 }
 
 static void mangle_ASCIINum(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_ASCII_NUM);
     /* FUZZERLOG: add mutator name */
     fuzzerlog_add_mutator_name("ascii_num");
 
@@ -866,6 +945,7 @@ static void mangle_ASCIINum(run_t* run, bool printable) {
 }
 
 static void mangle_ASCIINumChange(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_ASCII_NUM);
     size_t off = mangle_getOffSet(run);
 
     /* Find a digit */
@@ -945,6 +1025,7 @@ static void mangle_ASCIINumChange(run_t* run, bool printable) {
 }
 
 static void mangle_Splice(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_SPLICE);
     if (run->global->feedback.dynFileMethod == _HF_DYNFILE_NONE) {
         mangle_Bytes(run, printable);
         return;
@@ -1019,6 +1100,7 @@ static void mangle_Resize(run_t* run, bool printable) {
 }
 
 static void mangle_BlockRepeat(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_STRUCTURAL_BYTES);
     size_t off = mangle_getOffSet(run);
     size_t len = mangle_getLen(run->dynfile->size - off);
 
@@ -1051,6 +1133,7 @@ static void mangle_BlockRepeat(run_t* run, bool printable) {
 }
 
 static void mangle_BlockSwap(run_t* run, bool printable HF_ATTR_UNUSED) {
+    CHECK_MUT_DISABLED(MUT_CAT_STRUCTURAL_BYTES);
     if (run->dynfile->size < 8) return;
 
     size_t max_len = run->dynfile->size / 4;
@@ -1079,6 +1162,7 @@ static void mangle_BlockSwap(run_t* run, bool printable HF_ATTR_UNUSED) {
 }
 
 static void mangle_CmpSolve(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_CMPLOG);
     if (!run->global->feedback.cmpFeedback) {
         mangle_ConstFeedbackDict(run, printable);
         return;
@@ -1138,6 +1222,7 @@ static void mangle_CmpSolve(run_t* run, bool printable) {
 }
 
 static void mangle_InterestingValues(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_INTERESTING);
     static const struct {
         const uint8_t val[8];
         const size_t  len;
@@ -1178,6 +1263,7 @@ static void mangle_InterestingValues(run_t* run, bool printable) {
 }
 
 static void mangle_SpecialStrings(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_INTERESTING);
     static const char* const strings[] = {
         /* Format strings */
         "%s",
@@ -1241,6 +1327,7 @@ static void mangle_SpecialStrings(run_t* run, bool printable) {
 }
 
 static void mangle_ChunkShuffle(run_t* run, bool printable HF_ATTR_UNUSED) {
+    CHECK_MUT_DISABLED(MUT_CAT_STRUCTURAL_BYTES);
     if (run->dynfile->size < 8) return;
 
     size_t chunk_size = util_rndGet(1, 4);
@@ -1266,6 +1353,7 @@ static void mangle_ChunkShuffle(run_t* run, bool printable HF_ATTR_UNUSED) {
 }
 
 static void mangle_Arith8(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_ARITH);
     size_t off              = mangle_getOffSet(run);
     int8_t delta            = (int8_t)util_rndGet(1, 35) * (util_rnd64() & 1 ? 1 : -1);
     run->dynfile->data[off] = (uint8_t)((int8_t)run->dynfile->data[off] + delta);
@@ -1281,6 +1369,7 @@ static void mangle_Arith8(run_t* run, bool printable) {
  * Common in binary protocols, ASN.1, network packets, file formats
  */
 static void mangle_TlvMutate(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_STRUCTURAL_BYTES);
     if (run->dynfile->size < 4) {
         mangle_Bytes(run, printable);
         return;
@@ -1355,6 +1444,7 @@ static void mangle_TlvMutate(run_t* run, bool printable) {
  * Effective for text protocols, config files, command lines
  */
 static void mangle_TokenShuffle(run_t* run, bool printable HF_ATTR_UNUSED) {
+    CHECK_MUT_DISABLED(MUT_CAT_STRUCTURAL_BYTES);
     if (run->dynfile->size < 4) return;
 
     /* Find delimiter positions */
@@ -1440,6 +1530,7 @@ static void mangle_TokenShuffle(run_t* run, bool printable HF_ATTR_UNUSED) {
  * Gradient-guided CMP mutation - focus mutations on bytes that differ in comparisons
  */
 static void mangle_GradientCmp(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_CMPLOG);
     if (!run->global->feedback.cmpFeedback) {
         mangle_Bytes(run, printable);
         return;
@@ -1530,6 +1621,7 @@ static void mangle_GradientCmp(run_t* run, bool printable) {
  * Arithmetic mutations on discovered constants from CMP feedback
  */
 static void mangle_ArithConst(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_ARITH);
     if (!run->global->feedback.cmpFeedback) {
         mangle_AddSub(run, printable);
         return;
@@ -1600,6 +1692,7 @@ static void mangle_ArithConst(run_t* run, bool printable) {
 }
 
 static void mangle_DictionaryInsert(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_DICT_EXTRA);
     if (run->global->mutate.dictionaryCnt == 0) {
         mangle_Bytes(run, printable);
         return;
@@ -1634,6 +1727,7 @@ static void mangle_DictionaryInsert(run_t* run, bool printable) {
 }
 
 static void mangle_Punctuation(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_INTERESTING);
     static const char punct[] = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
     size_t            len     = util_rndGet(1, 4);
     uint8_t           buf[4];
@@ -1648,6 +1742,7 @@ static void mangle_Punctuation(run_t* run, bool printable) {
 }
 
 static void mangle_CrossOver(run_t* run, bool printable) {
+    CHECK_MUT_DISABLED(MUT_CAT_SPLICE);
     if (run->global->feedback.dynFileMethod == _HF_DYNFILE_NONE) {
         mangle_Bytes(run, printable);
         return;
