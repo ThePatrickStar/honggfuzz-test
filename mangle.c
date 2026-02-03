@@ -1930,6 +1930,28 @@ static inline mangle_t mangle_sanitize(run_t* run, mangle_t m) {
 }
 
 static mangle_t mangle_pickWeighted(run_t* run, uint8_t* tier_out) {
+    /* Check if MOpt adaptive scheduling is disabled via environment variable */
+    static bool moptDisabled = false;
+    static bool moptChecked  = false;
+    if (!moptChecked) {
+        moptChecked = true;
+        if (getenv("HF_DISABLE_MOPT")) {
+            moptDisabled = true;
+            LOG_I("MOpt adaptive scheduling disabled via HF_DISABLE_MOPT");
+        }
+    }
+
+    if (moptDisabled) {
+        /* 25% probability to use MANGLE_CONST_FEEDBACK_DICT (dynamic dictionary from CMP feedback) */
+        if (util_rnd64() % 4 == 0) {
+            *tier_out = TIER_DATA;
+            return mangle_sanitize(run, MANGLE_CONST_FEEDBACK_DICT);
+        }
+        /* 75% - use uniform random selection when MOpt is disabled */
+        *tier_out = TIER_OTHER;
+        return mangle_sanitize(run, (mangle_t)util_rndGet(0, MANGLE_COUNT - 1));
+    }
+
     /*
      * Adaptive weights - start with defaults, adjust based on success rate.
      * Use a simplified momentum-like approach where recent success bumps the weight
@@ -2041,6 +2063,20 @@ void mangle_mangleContent(run_t* run) {
     time_t   stagnation = time(NULL) - ATOMIC_GET(run->global->timing.lastCovUpdate);
     uint64_t base       = run->mutationsPerRun;
     bool     haveCmp    = run->global->feedback.cmpFeedback;
+
+    /* Check if CMPLog is disabled via environment variable */
+    static bool cmplogDisabled = false;
+    static bool cmplogChecked  = false;
+    if (!cmplogChecked) {
+        cmplogChecked = true;
+        if (getenv("HF_DISABLE_CMPLOG")) {
+            cmplogDisabled = true;
+            LOG_I("CMPLog disabled via HF_DISABLE_CMPLOG");
+        }
+    }
+    if (cmplogDisabled) {
+        haveCmp = false;
+    }
 
     run->mutationTiers = 0;
 
