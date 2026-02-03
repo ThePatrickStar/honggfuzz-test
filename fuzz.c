@@ -257,6 +257,14 @@ static void fuzz_perfFeedback(run_t* run) {
 
     /* Any increase in coverage (edge, pc, cmp, hw, stack) counters forces adding input to the
      * corpus */
+    if (getenv("DISABLE_COV_BIN_COUNT")) {
+        static bool warnPrinted = false;
+        if (!warnPrinted) {
+            LOG_I("DISABLE_COV_BIN_COUNT is set, ignoring bin count changes for seed retention");
+            warnPrinted = true;
+        }
+        softNewCmp = 0;
+    }
     if (run->hwCnts.newBBCnt > 0 || softNewPC > 0 || softNewEdge > 0 || softNewCmp > 0 ||
         softNewStackDepth || diff0 < 0 || diff1 < 0) {
         if (diff0 < 0) {
