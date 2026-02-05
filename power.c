@@ -30,6 +30,7 @@
 #include "libhfcommon/common.h"
 #include "libhfcommon/log.h"
 #include "libhfcommon/util.h"
+#include "fuzzerlogger.h"
 
 /*
  * 0 = no entropy (single byte value), 100 = maximum entropy (uniform distribution).
@@ -150,6 +151,13 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
         if (boost > decay) {
             energy <<= (boost - decay);
         }
+
+        /* FUZZERLOG: log strategy */
+        static bool fuzzerlog_conf_done = false;
+        if (!fuzzerlog_conf_done) {
+            fuzzerlog_conf_done = true;
+            fuzzerlog_conf("prefer_higher_coverage_seeds1");
+        }
     }
 
     /* Density - inputs with high coverage per byte are efficient */
@@ -159,6 +167,13 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
         /* Heuristic - >50% instructions/bytes is good (small dense loops), >200% is amazing */
         if (density > 50) energy = (energy * 3) / 2;
         if (density > 200) energy <<= 1;
+
+        /* FUZZERLOG: log strategy */
+        static bool fuzzerlog_conf_done = false;
+        if (!fuzzerlog_conf_done) {
+            fuzzerlog_conf_done = true;
+            fuzzerlog_conf("prefer_higher_coverage_seeds2");
+        }
     }
 
     /* Speed - faster inputs allow more mutations per second */
@@ -172,6 +187,13 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
             uint64_t exec_usecs  = HF_CAP(dynfile->timeExecUSecs, 100ULL, 10000000ULL);
             uint64_t speed_ratio = HF_CAP((avg_usecs * 16) / exec_usecs, 1ULL, 256ULL);
             energy               = (energy * speed_ratio) / 16;
+        }
+
+        /* FUZZERLOG: log strategy */
+        static bool fuzzerlog_conf_done = false;
+        if (!fuzzerlog_conf_done) {
+            fuzzerlog_conf_done = true;
+            fuzzerlog_conf("prefer_faster_seeds");
         }
     }
 
@@ -196,6 +218,13 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
     if (prefer_shorter_seeds_enabled && dynfile->size > 1024) {
         uint32_t log_size = util_Log2(dynfile->size);
         if (log_size > 10) energy >>= HF_MIN(log_size - 10, 4);
+
+        /* FUZZERLOG: log strategy */
+        static bool fuzzerlog_conf_done = false;
+        if (!fuzzerlog_conf_done) {
+            fuzzerlog_conf_done = true;
+            fuzzerlog_conf("prefer_shorter_seeds");
+        }
     }
 
     /*
@@ -208,6 +237,13 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
             /* Boost factor - 16KB->1x, 32KB->1.5x, 64KB->2x, 1MB->4x */
             energy = (energy * HF_MIN(stack_log - 2, 8)) / 2;
         }
+        
+        /* FUZZERLOG: log strategy */
+        static bool fuzzerlog_conf_done = false;
+        if (!fuzzerlog_conf_done) {
+            fuzzerlog_conf_done = true;
+            fuzzerlog_conf("prefer_deeper_stack_seeds");
+        }
     }
 
     /* Execution path diversity - boost inputs with unique execution paths */
@@ -217,6 +253,13 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
             /* More boost when we have fewer unique paths (early exploration) */
             energy = (energy * 5) / 4;
         }
+
+        /* FUZZERLOG: log strategy */
+        static bool fuzzerlog_conf_done = false;
+        if (!fuzzerlog_conf_done) {
+            fuzzerlog_conf_done = true;
+            fuzzerlog_conf("prefer_diverse_path_seeds");
+        }
     }
 
     /* CMP progress - inputs making progress on comparisons are valuable */
@@ -225,12 +268,26 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
         if (cmp_boost > 0) {
             energy = (energy * (4 + cmp_boost)) / 4;
         }
+
+        /* FUZZERLOG: log strategy */
+        static bool fuzzerlog_conf_done = false;
+        if (!fuzzerlog_conf_done) {
+            fuzzerlog_conf_done = true;
+            fuzzerlog_conf("prefer_cmp_progress_seeds");
+        }
     }
 
     /* Rare edge bonus - inputs hitting edges seen by few corpus entries */
     if (prefer_higher_coverage_enabled && dynfile->rareEdgeCnt > 0) {
         uint32_t rare_boost = HF_MIN(dynfile->rareEdgeCnt, 8);
         energy              = (energy * (8 + rare_boost)) / 8;
+
+        /* FUZZERLOG: log strategy */
+        static bool fuzzerlog_conf_done = false;
+        if (!fuzzerlog_conf_done) {
+            fuzzerlog_conf_done = true;
+            fuzzerlog_conf("prefer_higher_coverage_seeds3");
+        }
     }
 
     /* Diminishing returns - inputs selected many times yield less */
@@ -261,6 +318,13 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
                 else if (pct < 10)
                     energy >>= 2; /* Penalize very low coverage */
             }
+        }
+
+        /* FUZZERLOG: log strategy */
+        static bool fuzzerlog_conf_done = false;
+        if (!fuzzerlog_conf_done) {
+            fuzzerlog_conf_done = true;
+            fuzzerlog_conf("prefer_higher_coverage_seeds4");
         }
     }
 

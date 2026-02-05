@@ -1852,7 +1852,11 @@ static void mangle_Havoc(run_t* run, bool printable) {
         }
     }
     /* FUZZERLOG: mutator scheduler */
-    fuzzerlog_conf("havoc");
+    static bool fuzzerlog_conf_done = false;
+    if (!fuzzerlog_conf_done) {
+        fuzzerlog_conf_done = true;
+        fuzzerlog_conf("mutator_sched_havoc");
+    }
 }
 
 /*
@@ -1957,6 +1961,13 @@ static mangle_t mangle_pickWeighted(run_t* run, uint8_t* tier_out) {
      * Use a simplified momentum-like approach where recent success bumps the weight
      */
     uint8_t w[4] = {40, 25, 20, 15};
+
+    /* FUZZERLOG: log strategy */
+    static bool fuzzerlog_conf_done = false;
+    if (!fuzzerlog_conf_done) {
+        fuzzerlog_conf_done = true;
+        fuzzerlog_conf("mutator_sched_mopt");
+    }
 
     for (int i = 0; i < 4; i++) {
         uint64_t tries = ATOMIC_GET(run->global->mutate.stats[i].tries);
