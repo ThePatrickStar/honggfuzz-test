@@ -373,7 +373,7 @@ static bool input_cmpCov(dynfile_t* item1, dynfile_t* item2) {
 #define TAILQ_FOREACH_HF(var, head, field)                                                         \
     for ((var) = TAILQ_FIRST((head)); (var); (var) = TAILQ_NEXT((var), field))
 
-void input_addDynamicInput(run_t* run) {
+void input_addDynamicInput(run_t* run, const char* reason) {
     time_t now = time(NULL);
     ATOMIC_SET(run->global->timing.lastCovUpdate, now);
 
@@ -430,7 +430,7 @@ void input_addDynamicInput(run_t* run) {
     ATOMIC_POST_INC(run->global->io.dynfileqCnt);
     /* FUZZERLOG: log new seed */
     if (fuzzerlog_get_mutated()) {
-        fuzzerlog_new_seed(dynfile->path, "default");
+        fuzzerlog_new_seed(dynfile->path, (char*)reason);
     }
 
     if (run->global->socketFuzzer.enabled) {
@@ -706,7 +706,7 @@ void input_enqueueDynamicInputs(honggfuzz_t* hfuzz) {
         tmp_run.tmOutSignaled    = false;
         memcpy(tmp_dynfile.path, dynamicInputFileName, PATH_MAX);
         tmp_run.dynfile = &tmp_dynfile;
-        input_addDynamicInput(&tmp_run);
+        input_addDynamicInput(&tmp_run, NULL);
 
         /* Unmap input file. */
         if (munmap((void*)dynamicFile, dynamicFileSz) == -1) {

@@ -39,7 +39,7 @@ extern bool           input_parseDictionary(honggfuzz_t* hfuzz);
 extern void           input_freeDictionary(honggfuzz_t* hfuzz);
 extern bool           input_parseBlacklist(honggfuzz_t* hfuzz);
 extern bool           input_writeCovFile(const char* dir, dynfile_t* dynfile);
-extern void           input_addDynamicInput(run_t* run);
+extern void           input_addDynamicInput(run_t* run, const char* reason);
 extern bool           input_inDynamicCorpus(run_t* run, const char* fname, size_t len);
 extern void           input_renumerateInputs(honggfuzz_t* hfuzz);
 extern bool           input_prepareDynamicInput(run_t* run, bool needs_mangle);

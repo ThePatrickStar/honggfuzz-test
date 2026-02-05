@@ -162,7 +162,7 @@ static void fuzz_setDynamicMainState(run_t* run) {
         };
         dynfile_t* tmp_dynfile = run->dynfile;
         run->dynfile           = &dynfile;
-        input_addDynamicInput(run);
+        input_addDynamicInput(run, NULL);
         run->dynfile = tmp_dynfile;
     }
     snprintf(run->dynfile->path, sizeof(run->dynfile->path), "[DYNAMIC]");
@@ -360,7 +360,34 @@ static void fuzz_perfFeedback(run_t* run) {
             LOG_I("File imported: %s", run->dynfile->path);
             run->dynfile->imported = false;
         }
-        input_addDynamicInput(run);
+        /* FUZZERLOG: generate reason */
+        char reasonBuf[256];
+        char* ptr = reasonBuf;
+        char* end = reasonBuf + sizeof(reasonBuf);
+        bool first = true;
+
+#define APPEND_REASON(cond, name)                     \
+    do {                                              \
+        if (cond) {                                   \
+            if (!first) {                             \
+                ptr += snprintf(ptr, end - ptr, ","); \
+            }                                         \
+            ptr += snprintf(ptr, end - ptr, name);    \
+            first = false;                            \
+        }                                             \
+    } while (0)
+
+        APPEND_REASON(run->hwCnts.newBBCnt > 0, "new-bb");
+        APPEND_REASON(softNewPC > 0, "new-pc");
+        APPEND_REASON(softNewEdge > 0, "cov-new-tuple");
+        APPEND_REASON(softNewCmp > 0, "cov-new-count");
+        APPEND_REASON(softNewStackDepth, "new-stack-depth");
+        APPEND_REASON(diff0 < 0, "instr-cnt");
+        APPEND_REASON(diff1 < 0, "branch-cnt");
+
+#undef APPEND_REASON
+
+        input_addDynamicInput(run, first ? NULL : reasonBuf);
 
         if (run->global->socketFuzzer.enabled) {
             LOG_D("SocketFuzzer: fuzz: new BB (perf)");
