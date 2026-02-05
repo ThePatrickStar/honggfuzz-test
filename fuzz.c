@@ -828,6 +828,10 @@ void fuzz_threadsStart(honggfuzz_t* hfuzz) {
     if (fuzzerlog_end_exec_target == NULL) {
         LOG_F("fuzzer_log: Could not load fuzzerlog_end_exec_target: %s", dlerror());
     }
+    fuzzerlog_conf = dlsym(fuzzer_log_lib, "fuzzerlog_conf");
+    if (fuzzerlog_conf == NULL) {
+        LOG_F("fuzzer_log: Could not load fuzzerlog_end_exec_target: %s", dlerror());
+    }
 
     fuzzerlog_start();
 
