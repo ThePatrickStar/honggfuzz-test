@@ -131,6 +131,18 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
         }
     }
 
+    /* Check environment variable for other preference features */
+    static bool prefer_other_checked = false;
+    static bool prefer_other_enabled = true;
+    if (!prefer_other_checked) {
+        prefer_other_checked = true;
+        const char* env_val  = getenv("HFUZZ_PREFER_OTHER");
+        if (env_val && (env_val[0] == '0' || env_val[0] == 'n' || env_val[0] == 'N')) {
+            prefer_other_enabled = false;
+            LOG_I("Other preferences disabled via HFUZZ_PREFER_OTHER");
+        }
+    }
+
     /* Phase-aware energy - dry-run phase explores more, main phase exploits */
     fuzzState_t phase = run->global->feedback.state;
     if (phase == _HF_STATE_DYNAMIC_DRY_RUN) {
@@ -199,19 +211,35 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
 
     /* Fertility - inputs that produced children are in promising regions */
     uint32_t refs = ATOMIC_GET(dynfile->refs);
-    if (refs > 0) {
+    if (prefer_other_enabled && refs > 0) {
         /* Logarithmic boost for fertility */
         energy = (energy * (8 + HF_MIN(util_Log2(refs + 1), 8))) / 8;
+
+        /* FUZZERLOG: log strategy */
+        static bool fuzzerlog_conf_done = false;
+        if (!fuzzerlog_conf_done) {
+            fuzzerlog_conf_done = true;
+            fuzzerlog_conf("prefer_fertile_seeds");
+        }
     }
 
     /* Freshness - time-based, newer inputs haven't been fully explored */
-    time_t age_secs = now - dynfile->timeAdded;
-    if (age_secs < freshTimeSec) {
-        energy <<= 2; /* added in last 60s - 4x */
-    } else if (age_secs < recentTimeSec) {
-        energy <<= 1; /* added in last 5 minutes - 2x */
-    } else if (age_secs > staleTimeSec && refs == 0) {
-        energy >>= 1; /* older than 60 min with no children - 0.5x */
+    if (prefer_other_enabled) {
+        time_t age_secs = now - dynfile->timeAdded;
+        if (age_secs < freshTimeSec) {
+            energy <<= 2; /* added in last 60s - 4x */
+        } else if (age_secs < recentTimeSec) {
+            energy <<= 1; /* added in last 5 minutes - 2x */
+        } else if (age_secs > staleTimeSec && refs == 0) {
+            energy >>= 1; /* older than 60 min with no children - 0.5x */
+        }
+
+        /* FUZZERLOG: log strategy */
+        static bool fuzzerlog_conf_done = false;
+        if (!fuzzerlog_conf_done) {
+            fuzzerlog_conf_done = true;
+            fuzzerlog_conf("prefer_fresh_seeds");
+        }
     }
 
     /* Size - smaller inputs are faster and easier to analyze */
@@ -231,7 +259,7 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
      * Stack depth - deeper execution paths suggest complex logic/recursion.
      * Boost energy for inputs causing deep stack usage.
      */
-    if (dynfile->stackDepth > (1024 * 16)) { /* > 16KB */
+    if (prefer_other_enabled && dynfile->stackDepth > (1024 * 16)) { /* > 16KB */
         uint32_t stack_log = util_Log2(dynfile->stackDepth / 1024);
         if (stack_log > 4) {
             /* Boost factor - 16KB->1x, 32KB->1.5x, 64KB->2x, 1MB->4x */
@@ -247,7 +275,7 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
     }
 
     /* Execution path diversity - boost inputs with unique execution paths */
-    if (dynfile->pathHash != 0) {
+    if (prefer_other_enabled && dynfile->pathHash != 0) {
         uint64_t uniquePaths = ATOMIC_GET(run->global->feedback.uniquePaths);
         if (uniquePaths > 0 && uniquePaths < 1000) {
             /* More boost when we have fewer unique paths (early exploration) */
@@ -263,7 +291,7 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
     }
 
     /* CMP progress - inputs making progress on comparisons are valuable */
-    if (dynfile->cmpProgress > 0) {
+    if (prefer_other_enabled && dynfile->cmpProgress > 0) {
         uint32_t cmp_boost = HF_MIN(dynfile->cmpProgress / 8, 4);
         if (cmp_boost > 0) {
             energy = (energy * (4 + cmp_boost)) / 4;
@@ -291,19 +319,35 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
     }
 
     /* Diminishing returns - inputs selected many times yield less */
-    uint32_t selectCnt = ATOMIC_GET(dynfile->selectCnt);
-    if (selectCnt > 100) {
-        uint32_t penalty = HF_MIN(util_Log2(selectCnt / 100), 3);
-        energy >>= penalty;
+    if (prefer_other_enabled) {
+        uint32_t selectCnt = ATOMIC_GET(dynfile->selectCnt);
+        if (selectCnt > 100) {
+            uint32_t penalty = HF_MIN(util_Log2(selectCnt / 100), 3);
+            energy >>= penalty;
+        }
+
+        /* FUZZERLOG: log strategy */
+        static bool fuzzerlog_conf_done = false;
+        if (!fuzzerlog_conf_done) {
+            fuzzerlog_conf_done = true;
+            fuzzerlog_conf("prefer_less_selected_seeds");
+        }
     }
 
     /*
      * Depth - deeply derived inputs may be over-specialized.
      * Progressive penalty - starts at depth 4, increases logarithmically.
      */
-    if (dynfile->depth > 8) { /* Relaxed from 4 to 8 */
+    if (prefer_other_enabled && dynfile->depth > 8) { /* Relaxed from 4 to 8 */
         uint32_t depth_penalty = HF_MIN(util_Log2(dynfile->depth - 7), 3);
         energy >>= depth_penalty;
+
+        /* FUZZERLOG: log strategy */
+        static bool fuzzerlog_conf_done2 = false;
+        if (!fuzzerlog_conf_done2) {
+            fuzzerlog_conf_done2 = true;
+            fuzzerlog_conf("prefer_shallow_depth_seeds");
+        }
     }
 
     /* Stagnation - focus on best inputs when stuck */
@@ -329,7 +373,7 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
     }
 
     /* Entropy - penalize random blobs, boost structured data */
-    if (dynfile->size > 0) {
+    if (prefer_other_enabled && dynfile->size > 0) {
         unsigned entropy = power_ComputeEntropy(dynfile->data, dynfile->size);
         if (entropy > 93) {
             energy /= 2; /* High entropy (compressed/encrypted/random) - likely harder to fuzz */
@@ -337,6 +381,13 @@ uint64_t power_calculateEnergy(run_t* run, dynfile_t* dynfile) {
             energy /= 2; /* Very low entropy (sparse/zeros) - likely uninteresting */
         } else if (entropy < 62) {
             energy = (energy * 3) / 2; /* Text/Structured data - boost */
+        }
+
+        /* FUZZERLOG: log strategy */
+        static bool fuzzerlog_conf_done = false;
+        if (!fuzzerlog_conf_done) {
+            fuzzerlog_conf_done = true;
+            fuzzerlog_conf("prefer_structured_entropy_seeds");
         }
     }
 
