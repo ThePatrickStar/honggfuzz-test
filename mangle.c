@@ -341,7 +341,7 @@ static void mangle_Bytes(run_t* run, bool printable) {
 }
 
 static void mangle_ByteRepeat(run_t* run, bool printable) {
-    CHECK_MUT_DISABLED(MUT_CAT_RANDOM_BYTES);
+    CHECK_MUT_DISABLED(MUT_CAT_STRUCTURAL_BYTES);
     size_t off     = mangle_getOffSet(run);
     size_t destOff = off + 1;
     size_t maxSz   = run->dynfile->size - destOff;
